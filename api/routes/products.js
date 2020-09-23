@@ -1,22 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const { update } = require('../models/product');
-
 const Product = require('../models/product');
 
 // get products
 router.get('/', (req, res, next) => {
-	Product.find().exec().then(docs => {
-		if (docs.length > 0) {
-			res.status(200).json(docs);
-		} else if(docs.length === 0) {
-			res.status(200).json({message: 'Not element in list'});
-		}else {
-			res.status(404).json({
-				message: 'No entries found'
-			});
-		}
+	Product.find().select("name price _id").exec().then(docs => {
+		const response = {
+			count: docs.length,
+			products: docs.map(doc => {
+				return {
+					_id: doc._id,
+					name: doc.name,
+					price: doc.price,
+					request: {
+						type: 'GET',
+						url: 'http://localhost:3000/products' + doc._id
+					}
+				}
+			})
+		};
+		res.status(200).json(response);
 	}).catch(err => {
 		res.status(500).json({ error: err });
 	});
@@ -31,10 +35,18 @@ router.post('/', (req, res, next) => {
 	product.save().then(result => {
 		// console.log(result);
 		res.status(200).json({
-			message: "Handling POST request to /product",
-			createdProduct: result
+			message: "Created product successfully",
+			createdProduct: {
+				_id: result._id,
+				name: result.name,
+				price: result.price,
+				request: {
+					type: 'POST',
+					url: 'http://localhost:3000/products' + result._id
+				}
+			}
 		});
-	}).catch(err => console.log(err));
+	}).catch(err => res.status(500).json({ error: err }));
 });
 
 router.get('/:productId', (req, res, next) => {
@@ -56,13 +68,13 @@ router.get('/:productId', (req, res, next) => {
 
 router.patch('/:productId', (req, res, next) => {
 	const updateOps = {};
-	for(const ops of req.body) {
+	for (const ops of req.body) {
 		updateOps[ops.propName] = ops.value;
 	}
-	Product.update({_id: req.params.productId}, {$set: updateOps}).exec().then(result => {
+	Product.update({ _id: req.params.productId }, { $set: updateOps }).exec().then(result => {
 		res.status(200).json(result);
 	}).catch(err => {
-		res.status(500).json({error: err});
+		res.status(500).json({ error: err });
 	});
 });
 
